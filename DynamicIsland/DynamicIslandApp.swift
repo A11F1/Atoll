@@ -295,6 +295,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // synchronously here so it is never left frozen. (See issue #568.)
         SystemOSDManager.resumeOSDUIHelperForTermination()
 
+        // Close any waiting Claude permission hooks so the terminal takes over.
+        MainActor.assumeIsolated { ClaudeSessionManager.shared.shutdown() }
+
         // Cancel any pending window size updates
         windowSizeUpdateWorkItem?.cancel()
         NotificationCenter.default.removeObserver(self)
@@ -567,6 +570,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Use a consistent height for different view types
         if coordinator.currentView == .timer {
             baseSize.height = 250 // Extra space for timer presets
+        } else if coordinator.currentView == .llmUsage {
+            baseSize.height = max(baseSize.height, llmUsageOpenNotchHeight)
         } else if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             baseSize.height = max(baseSize.height, preferredHeight)
@@ -756,6 +761,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Honour "Save History Across Restarts" before anything can read the
         // stored history back.
         ClipboardManager.purgeStoredHistoryIfPersistenceDisabled()
+
+        // Claude Code sessions (listens only while the feature is on)
+        if !AppRuntimeEnvironment.isUITesting {
+            ClaudeSessionManager.shared.configure()
+        }
 
         // Setup ScreenRecording Manager
         if Defaults[.enableScreenRecordingDetection] && !AppRuntimeEnvironment.isUITesting {

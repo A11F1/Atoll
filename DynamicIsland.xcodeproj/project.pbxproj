@@ -787,7 +787,7 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1637;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
-				DEVELOPMENT_TEAM = 9Y64TRM77N;
+				DEVELOPMENT_TEAM = BHPT8799Y3;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -810,6 +810,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Atoll uses Apple Music to fetch animated artwork for the lock screen wallpaper.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
@@ -856,13 +857,11 @@
 				AUTOMATION_APPLE_EVENTS = YES;
 				CODE_SIGN_ENTITLEMENTS = DynamicIsland/DynamicIsland.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Developer ID Application";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1637;
 				DEVELOPMENT_ASSET_PATHS = "\"DynamicIsland/Preview Content\"";
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=macosx*]" = 9Y64TRM77N;
+				DEVELOPMENT_TEAM = BHPT8799Y3;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
@@ -885,6 +884,7 @@
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_MetalCaptureEnabled = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Atoll uses AppleScripts to control Spotify, Apple Music, and Notes.";
+				INFOPLIST_KEY_NSAppleMusicUsageDescription = "Atoll uses Apple Music to fetch animated artwork for the lock screen wallpaper.";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Atoll needs Bluetooth access to detect when audio devices connect and display their battery status in the HUD.";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Show calender events inside the notch";
 				INFOPLIST_KEY_NSCalendarsUsageDescription = "Need for Calendar Mode";
@@ -904,7 +904,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.6;
 				MARKETING_VERSION = 2.3.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.Ebullioscopic.Atoll;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alifazril.Atoll;
 				PRODUCT_NAME = Atoll;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;

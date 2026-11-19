@@ -116,22 +116,13 @@ struct JSONLUsageParser {
         )
     }
 
-    /// Session logs are append-only, so a file whose last write predates the
-    /// window cannot contain a record inside it. Returns `true` when the date is
-    /// unreadable, so an unexpected filesystem keeps the file rather than
-    /// silently dropping its records.
-    private static func mayContainRecords(after cutoff: Date, _ file: URL) -> Bool {
-        guard let modified = try? file.resourceValues(forKeys: [.contentModificationDateKey])
-            .contentModificationDate
-        else { return true }
-        return modified >= cutoff
-    }
-
     /// Stream a JSONL file line by line, calling `process` for each valid record.
     /// Avoids loading the entire file into memory.
     private static func streamLines(
         from file: URL,
         weekStart: Date,
+        monthStart: Date,
+        lastMonthStart: Date,
         sessionStart: Date,
         now: Date,
         seen: inout Set<String>,
@@ -148,7 +139,6 @@ struct JSONLUsageParser {
         var discardingOversized = false
 
         func processRecord(_ rec: UsageRecord) {
-            guard rec.timestamp >= weekStart else { return }
             if let key = rec.dedupKey {
                 if seen.contains(key) { return }
                 seen.insert(key)
@@ -160,6 +150,14 @@ struct JSONLUsageParser {
                 t.outputTokens += rec.outputTokens
                 if let cost { t.costUSD += cost } else { t.hasUnpricedModel = true }
             }
+            add(&snapshot.total)
+            if rec.timestamp >= monthStart {
+                add(&snapshot.month)
+            } else if rec.timestamp >= lastMonthStart {
+                add(&snapshot.lastMonth)
+            }
+            // Everything below covers the last 7 days only, as before.
+            guard rec.timestamp >= weekStart else { return }
             add(&snapshot.week)
             if cal.isDate(rec.timestamp, inSameDayAs: now) { add(&snapshot.today) }
             if rec.timestamp >= sessionStart { add(&snapshot.session) }
@@ -215,24 +213,86 @@ struct JSONLUsageParser {
         }
     }
 
-    static func aggregate(files: [URL], now: Date) -> UsageSnapshot {
+    /// Usage from log files last written before the previous calendar month. Those
+    /// files are append-only and can only feed the all-time total, so their sum is
+    /// reused until the set of such files (or the month) changes.
+    private struct HistoricalTotals {
+        let cutoff: Date
+        let fingerprint: [String: Date] // file path -> modification date
+        let total: UsageTotals
+        let seen: Set<String> // dedup keys, so recent files skip copies of old records
+    }
+
+    private static let historicalLock = NSLock()
+    private static var historicalCache: [String: HistoricalTotals] = [:]
+
+    private static func modificationDate(_ file: URL) -> Date? {
+        try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
+    /// - Parameter cacheKey: identifies the caller's log set (e.g. one provider). When set,
+    ///   the totals of files untouched since before last month are cached under it.
+    static func aggregate(files: [URL], now: Date, cacheKey: String? = nil) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
         var perModel: [String: UsageTotals] = [:]
         var seen = Set<String>()
         let sessionStart = now.addingTimeInterval(-5 * 3600)
         let weekStart = now.addingTimeInterval(-7 * 86400)
+        let cal = Calendar.current
+        let monthStart = cal.dateInterval(of: .month, for: now)?.start ?? weekStart
+        let lastMonthStart = cal.date(byAdding: .month, value: -1, to: monthStart) ?? monthStart
 
-        for file in files where mayContainRecords(after: weekStart, file) {
+        func scan(_ file: URL, into snap: inout UsageSnapshot, models: inout [String: UsageTotals]) {
             streamLines(
                 from: file,
                 weekStart: weekStart,
+                monthStart: monthStart,
+                lastMonthStart: lastMonthStart,
                 sessionStart: sessionStart,
                 now: now,
                 seen: &seen,
-                perModel: &perModel,
-                snapshot: &snapshot
+                perModel: &models,
+                snapshot: &snap
             )
         }
+
+        var recentFiles = files
+        if let cacheKey {
+            // A file last written before last month holds only records older than
+            // every window except the total.
+            var historical: [URL] = []
+            var fingerprint: [String: Date] = [:]
+            recentFiles = []
+            for file in files {
+                if let modified = modificationDate(file), modified < lastMonthStart {
+                    historical.append(file)
+                    fingerprint[file.path] = modified
+                } else {
+                    recentFiles.append(file)
+                }
+            }
+
+            historicalLock.lock()
+            let cached = historicalCache[cacheKey]
+            historicalLock.unlock()
+
+            if let cached, cached.cutoff == lastMonthStart, cached.fingerprint == fingerprint {
+                snapshot.total = cached.total
+                seen = cached.seen
+            } else {
+                var oldSnapshot = UsageSnapshot()
+                var oldModels: [String: UsageTotals] = [:]
+                for file in historical { scan(file, into: &oldSnapshot, models: &oldModels) }
+                snapshot.total = oldSnapshot.total
+                let entry = HistoricalTotals(cutoff: lastMonthStart, fingerprint: fingerprint,
+                                             total: oldSnapshot.total, seen: seen)
+                historicalLock.lock()
+                historicalCache[cacheKey] = entry
+                historicalLock.unlock()
+            }
+        }
+
+        for file in recentFiles { scan(file, into: &snapshot, models: &perModel) }
         snapshot.models = perModel
             .map { ModelUsage(model: $0.key, totals: $0.value, pool: nil) }
             .sorted { $0.totals.costUSD > $1.totals.costUSD }

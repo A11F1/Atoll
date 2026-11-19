@@ -10,3 +10,11 @@ FingerprintScan.json is the "Fingerprint Scan" animation by Eddy Gann,
 downloaded from LottieFiles and used under the Lottie Simple License:
 https://lottiefiles.com/free-animation/fingerprint-scan-VQf6EWRtkS
 https://lottiefiles.com/page/license
+
+The Claude Code sessions feature (DynamicIsland/managers/ClaudeSessions and
+DynamicIsland/components/ClaudeSessions) includes code adapted from
+Vibe Notch (formerly Claude Island) by Farouq Aldori,
+https://github.com/farouqaldori/vibe-notch, licensed under the Apache
+License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
+Changes: rewritten hook script and socket protocol, a smaller session model,
+a new notch UI, and opt-in hook installation; analytics removed.

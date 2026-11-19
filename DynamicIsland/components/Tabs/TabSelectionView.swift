@@ -51,6 +51,8 @@ struct TabSelectionView: View {
     @State private var showQuickSharePopover = false
     @Default(.enableTimerFeature) var enableTimerFeature
     @Default(.enableStatsFeature) var enableStatsFeature
+    @Default(.enableClaudeSessions) private var enableClaudeSessions
+    @Default(.showClaudeSessionsTab) private var showClaudeSessionsTab
     @Default(.enableColorPickerFeature) var enableColorPickerFeature
     @Default(.timerDisplayMode) var timerDisplayMode
     @Default(.enableThirdPartyExtensions) private var enableThirdPartyExtensions
@@ -85,6 +87,11 @@ struct TabSelectionView: View {
         // Usage tab only shown when LLM usage feature is enabled
         if Defaults[.enableLLMUsageFeature] {
             tabsArray.append(TabModel(label: "Usage", icon: "chart.bar.doc.horizontal", view: .llmUsage))
+        }
+
+        // Live Claude Code sessions (adapted from Vibe Notch)
+        if enableClaudeSessions && showClaudeSessionsTab {
+            tabsArray.append(TabModel(label: "Claude", icon: "sparkle", view: .claudeSessions))
         }
 
         if Defaults[.enableNotes] || (Defaults[.enableClipboardManager] && Defaults[.clipboardDisplayMode] == .separateTab) {

@@ -16,7 +16,7 @@ struct ClaudeUsageProvider: UsageProvider {
         }
         let files = jsonlFiles(under: root)
         guard !files.isEmpty else { throw UsageError.notFound("No Claude usage logs found") }
-        var snapshot = JSONLUsageParser.aggregate(files: files, now: now)
+        var snapshot = JSONLUsageParser.aggregate(files: files, now: now, cacheKey: id.rawValue)
         let quota = await quotaClient.fetchLimits()
         snapshot.sessionLimit = quota.session
         snapshot.weekLimit = quota.week
@@ -42,9 +42,11 @@ struct ClaudeUsageProvider: UsageProvider {
         // absent OR blank/whitespace (a present-but-empty string must not short-circuit
         // the fallback). Return nil if neither yields a non-empty label so the badge
         // isn't rendered as an empty capsule.
+        // "default_claude_ai" is the generic tier (it would show as "Ai"), so
+        // skip it and use organizationType (e.g. "claude_pro" → "Pro") instead.
         let raw = [account["organizationRateLimitTier"], account["organizationType"]]
             .compactMap { ($0 as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first { !$0.isEmpty }
+            .first { !$0.isEmpty && $0 != "default_claude_ai" }
         guard let raw else { return nil }
         let label = prettyPlan(raw)
         return label.isEmpty ? nil : label

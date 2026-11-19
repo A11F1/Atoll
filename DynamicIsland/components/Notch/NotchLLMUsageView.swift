@@ -26,12 +26,16 @@ enum AntigravityPool: String, CaseIterable {
 
 struct NotchLLMUsageView: View {
     @ObservedObject private var manager = LLMUsageManager.shared
+    @ObservedObject private var fx = USDToMYRRate.shared
     @State private var antigravityPool: AntigravityPool = .gemini
+    @Default(.llmUsageMaxProviders) private var maxProviders
 
     private func isEnabled(_ provider: ProviderID) -> Bool { Defaults[provider.enabledKey] }
 
+    /// Enabled providers in settings order, limited to the chosen count.
     private var enabledProviders: [ProviderID] {
-        ProviderID.allCases.filter { isEnabled($0) }
+        let enabled = ProviderID.allCases.filter { isEnabled($0) }
+        return maxProviders > 0 ? Array(enabled.prefix(maxProviders)) : enabled
     }
 
     var body: some View {
@@ -43,7 +47,10 @@ struct NotchLLMUsageView: View {
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
         .environment(\.colorScheme, .dark)
-        .onAppear { manager.refreshAll() }
+        .onAppear {
+            manager.refreshAll()
+            fx.refreshIfStale()
+        }
     }
 
     @ViewBuilder
@@ -106,6 +113,9 @@ struct NotchLLMUsageView: View {
                 if provider != .cursor {
                     window("Today", snap.today, prominent: true)
                     window("Week", snap.week)
+                    window("Month", snap.month)
+                    window("Last Month", snap.lastMonth)
+                    window("Total", snap.total)
                     window("Session", snap.session)
                 }
                 Text("quota unavailable").font(.caption2).foregroundStyle(.secondary.opacity(0.7))
@@ -119,6 +129,9 @@ struct NotchLLMUsageView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         window("Today", snap.today, compact: true)
                         window("Week", snap.week, compact: true)
+                        window("Month", snap.month, compact: true)
+                        window("Last Month", snap.lastMonth, compact: true)
+                        window("Total", snap.total, compact: true)
                     }
                 }
             }
@@ -296,7 +309,7 @@ struct NotchLLMUsageView: View {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-                .frame(width: compact ? 56 : 48, alignment: .leading)
+                .frame(width: compact ? 64 : 60, alignment: .leading)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Text(displayValue)
@@ -321,15 +334,21 @@ struct NotchLLMUsageView: View {
     /// table we cannot price them: show "\(money)+" when a partial amount is known,
     /// and an explicit "est. n/a" instead of a misleading "$0.00+" when nothing is.
     private func costLabel(_ totals: UsageTotals) -> String {
-        guard totals.hasUnpricedModel else { return money(totals.costUSD) }
-        return totals.costUSD > 0 ? money(totals.costUSD) + "+" : "est. n/a"
+        guard totals.hasUnpricedModel else { return dualMoney(totals.costUSD, suffix: "") }
+        return totals.costUSD > 0 ? dualMoney(totals.costUSD, suffix: "+") : "est. n/a"
+    }
+
+    /// "US$89.16 · RM375.47" — MYR is converted from USD at the cached rate.
+    private func dualMoney(_ usd: Double, suffix: String) -> String {
+        money(usd) + suffix + " · " + myr(usd * fx.rate) + suffix
     }
 
     private func costHelp(_ totals: UsageTotals) -> String {
+        let rateNote = " MYR converted at 1 USD = \(String(format: "%.4f", fx.rate)) MYR\(fx.isFallback ? " (offline fallback rate)" : "")."
         if totals.hasUnpricedModel {
-            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable."
+            return "Estimated API-equivalent cost from local token counts (not your subscription bill). Some models used do not have usable pricing, so this is partial or unavailable." + rateNote
         }
-        return "Estimated API-equivalent cost from local token counts (cache reads and writes priced at the provider's cache rates), not your subscription bill."
+        return "Estimated API-equivalent cost from local token counts (cache reads and writes priced at the provider's cache rates), not your subscription bill." + rateNote
     }
 
     private func tokens(_ n: Int) -> String {
@@ -358,5 +377,62 @@ struct NotchLLMUsageView: View {
 
     private func money(_ v: Double) -> String {
         Self.currencyFormatter.string(from: v as NSNumber) ?? String(format: "$%.2f", v)
+    }
+
+    private static let myrFormatter: NumberFormatter = {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = 2
+        f.maximumFractionDigits = 2
+        return f
+    }()
+
+    private func myr(_ v: Double) -> String {
+        "RM" + (Self.myrFormatter.string(from: v as NSNumber) ?? String(format: "%.2f", v))
+    }
+}
+
+/// USD→MYR exchange rate, fetched from a free no-key API at most every 12 hours
+/// and cached in UserDefaults. Falls back to a fixed rate when offline.
+@MainActor
+final class USDToMYRRate: ObservableObject {
+    static let shared = USDToMYRRate()
+
+    private static let fallbackRate = 4.20
+    private static let maxAge: TimeInterval = 12 * 3600
+    private static let rateKey = "fx.usdToMyr.rate"
+    private static let dateKey = "fx.usdToMyr.fetchedAt"
+    private static let endpoint = URL(string: "https://open.er-api.com/v6/latest/USD")!
+
+    @Published private(set) var rate: Double
+    @Published private(set) var isFallback: Bool
+    private var fetchedAt: Date?
+    private var isFetching = false
+
+    private init() {
+        let stored = UserDefaults.standard.double(forKey: Self.rateKey)
+        rate = stored > 0 ? stored : Self.fallbackRate
+        isFallback = stored <= 0
+        fetchedAt = UserDefaults.standard.object(forKey: Self.dateKey) as? Date
+    }
+
+    func refreshIfStale() {
+        if let fetchedAt, Date().timeIntervalSince(fetchedAt) < Self.maxAge { return }
+        guard !isFetching else { return }
+        isFetching = true
+        Task {
+            defer { isFetching = false }
+            guard let (data, _) = try? await URLSession.shared.data(from: Self.endpoint),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let rates = json["rates"] as? [String: Any],
+                  let myr = (rates["MYR"] as? NSNumber)?.doubleValue, myr > 0
+            else { return }
+            let now = Date()
+            rate = myr
+            isFallback = false
+            fetchedAt = now
+            UserDefaults.standard.set(myr, forKey: Self.rateKey)
+            UserDefaults.standard.set(now, forKey: Self.dateKey)
+        }
     }
 }

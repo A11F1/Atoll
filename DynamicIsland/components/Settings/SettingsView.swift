@@ -7976,6 +7976,9 @@ struct StatsSettings: View {
     @Default(.enableStatsFeature) var enableStatsFeature
     @Default(.enableLLMUsageFeature) var enableLLMUsageFeature
     @Default(.enableNewAPIProvider) var enableNewAPIProvider
+    @Default(.enableClaudeSessions) var enableClaudeSessions
+    @Default(.llmUsageMaxProviders) var llmUsageMaxProviders
+    @ObservedObject var claudeSessions = ClaudeSessionManager.shared
     @Default(.statsStopWhenNotchCloses) var statsStopWhenNotchCloses
     @Default(.statsUpdateInterval) var statsUpdateInterval
     @Default(.showCpuGraph) var showCpuGraph
@@ -8041,6 +8044,51 @@ struct StatsSettings: View {
                     .font(.caption)
             }
 
+            Section {
+                Defaults.Toggle(key: .enableClaudeSessions) {
+                    Text("Show Claude Code sessions")
+                }
+                .settingsHighlight(id: highlightID("Show Claude Code sessions"))
+
+                if enableClaudeSessions {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Claude Code hooks")
+                            Text(claudeSessions.hookStatus == .installed
+                                 ? "Installed in ~/.claude/settings.json"
+                                 : "Not installed")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if claudeSessions.hookStatus == .installed {
+                            Button("Remove Hooks") { claudeSessions.uninstallHooks() }
+                        } else {
+                            Button("Install Hooks") { claudeSessions.installHooks() }
+                                .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    if let error = claudeSessions.lastError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                    Defaults.Toggle(key: .showClaudeSessionsTab) {
+                        Text("Show Claude tab in the notch")
+                    }
+                    Defaults.Toggle(key: .showClaudeSessionsLiveActivity) {
+                        Text("Show activity in the closed notch")
+                    }
+                }
+            } header: {
+                Text("Claude Code Sessions")
+            } footer: {
+                Text("Shows your running Claude Code sessions in the notch and lets you approve tool permissions there. Installing hooks adds Atoll's entries to ~/.claude/settings.json (a backup is saved as settings.json.atoll-backup); removing them deletes only Atoll's entries. New sessions appear once the hooks are installed; sessions already running pick them up after a restart. Based on Vibe Notch by Farouq Aldori (Apache 2.0).")
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+
             if enableLLMUsageFeature {
                 Section {
                     Defaults.Toggle(key: .enableClaudeProvider) {
@@ -8070,10 +8118,18 @@ struct StatsSettings: View {
                     .onChange(of: enableNewAPIProvider) { _, _ in
                         LLMUsageManager.shared.refreshAll(force: true)
                     }
+
+                    Picker("AI cards shown in the notch", selection: $llmUsageMaxProviders) {
+                        Text("All").tag(0)
+                        ForEach(1...4, id: \.self) { count in
+                            Text("\(count)").tag(count)
+                        }
+                    }
+                    .settingsHighlight(id: highlightID("AI cards shown in the notch"))
                 } header: {
                     Text("LLM Providers")
                 } footer: {
-                    Text("Choose which AI providers appear in the Usage tab.")
+                    Text("Choose which AI providers appear in the Usage tab. When you limit the number of cards, the first enabled providers in this list are shown. Fewer cards give each one more room.")
                         .multilineTextAlignment(.trailing)
                         .foregroundStyle(.secondary)
                     .font(.caption)

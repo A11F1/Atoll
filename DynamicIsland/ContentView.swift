@@ -46,6 +46,9 @@ struct ContentView: View {
     @ObservedObject var musicManager = MusicManager.shared
     @ObservedObject var timerManager = TimerManager.shared
     @ObservedObject var reminderManager = ReminderLiveActivityManager.shared
+    @ObservedObject var claudeSessions = ClaudeSessionManager.shared
+    @Default(.enableClaudeSessions) var enableClaudeSessions
+    @Default(.showClaudeSessionsLiveActivity) var showClaudeSessionsLiveActivity
     @ObservedObject var batteryModel = BatteryStatusViewModel.shared
     @ObservedObject var statsManager = StatsManager.shared
     @ObservedObject var recordingManager = ScreenRecordingManager.shared
@@ -188,7 +191,11 @@ struct ContentView: View {
         if coordinator.currentView == .timer {
             return CGSize(width: baseSize.width, height: 250) // Extra height for timer presets
         }
-        
+
+        if coordinator.currentView == .llmUsage {
+            return CGSize(width: baseSize.width, height: max(baseSize.height, llmUsageOpenNotchHeight))
+        }
+
         if coordinator.currentView == .notes {
             let preferredHeight = coordinator.notesLayoutState.preferredHeight
             let resolvedHeight = max(baseSize.height, preferredHeight)
@@ -1132,6 +1139,10 @@ struct ContentView: View {
                       } else if vm.notchState == .closed && capsLockManager.isCapsLockActive && Defaults[.enableCapsLockIndicator] && !vm.hideOnClosed && !lockScreenManager.isLocked {
                           InlineHUD(type: .constant(.capsLock), value: .constant(1.0), icon: .constant(""), hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(AnyTransition.move(edge: .trailing).combined(with: .opacity))
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && enableClaudeSessions && showClaudeSessionsLiveActivity && claudeSessions.needsAttention && !vm.hideOnClosed {
+                          ClaudeSessionsLiveActivity()
+                              .id("claude-attention")
+                              .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
                       } else if canShowMusicDuringExpansion && musicPairingEligible {
                           MusicLiveActivity(secondary: musicSecondary)
                               .id("closed-music-live-activity")
@@ -1142,6 +1153,10 @@ struct ContentView: View {
                           ReminderLiveActivity()
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .recording) && vm.notchState == .closed && recordingManager.isRecording && Defaults[.enableScreenRecordingDetection] && Defaults[.showRecordingIndicator] && !vm.hideOnClosed && !musicPairingEligible {
                           RecordingLiveActivity(hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
+                      } else if !isCurrentScreenExpansionVisible && vm.notchState == .closed && enableClaudeSessions && showClaudeSessionsLiveActivity && claudeSessions.workingCount > 0 && !vm.hideOnClosed {
+                          ClaudeSessionsLiveActivity()
+                              .id("claude-working")
+                              .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
                       } else if (!isCurrentScreenExpansionVisible || currentScreenExpansionType == .download) && vm.notchState == .closed && downloadManager.isDownloading && Defaults[.enableDownloadListener] && !vm.hideOnClosed {
                           DownloadLiveActivity()
                               .transition(.blurReplace.animation(.interactiveSpring(dampingFraction: 1.2)))
@@ -1296,6 +1311,8 @@ struct ContentView: View {
                                   NotchStatsView()
                               case .llmUsage:
                                   NotchLLMUsageView()
+                              case .claudeSessions:
+                                  NotchClaudeSessionsView()
                               case .colorPicker:
                                   NotchColorPickerView()
                             case .notes:

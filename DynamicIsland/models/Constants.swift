@@ -1287,6 +1287,12 @@ extension Defaults.Keys {
     static let enableAntigravityProvider = Key<Bool>("enableAntigravityProvider", default: true)
     static let enableNewAPIProvider = Key<Bool>("enableNewAPIProvider", default: false)
     static let newAPIAccounts = Key<[NewAPIAccount]>("newAPIAccounts", default: [])
+    /// How many AI provider cards the Usage tab shows (0 = all enabled). Defaults to 2 so cards stay readable.
+    static let llmUsageMaxProviders = Key<Int>("llmUsageMaxProviders", default: 2)
+    // MARK: Claude Code Sessions
+    static let enableClaudeSessions = Key<Bool>("enableClaudeSessions", default: false)
+    static let showClaudeSessionsTab = Key<Bool>("showClaudeSessionsTab", default: true)
+    static let showClaudeSessionsLiveActivity = Key<Bool>("showClaudeSessionsLiveActivity", default: true)
     static let autoStartStatsMonitoring = Key<Bool>("autoStartStatsMonitoring", default: true)
     static let statsStopWhenNotchCloses = Key<Bool>("statsStopWhenNotchCloses", default: true)
     static let statsUpdateInterval = Key<Double>("statsUpdateInterval", default: 1.0)

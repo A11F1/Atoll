@@ -167,6 +167,9 @@ let minimalisticTimerCountdownTopPadding: CGFloat = 12
 let minimalisticTimerCountdownContentHeight: CGFloat = 82
 let minimalisticTimerCountdownBlockHeight: CGFloat = minimalisticTimerCountdownTopPadding + minimalisticTimerCountdownContentHeight
 let statsSecondRowContentHeight: CGFloat = 120
+/// Open height of the Usage tab: tall enough for the quota gauges plus the
+/// Today / Week / Month / Last Month / Total rows.
+let llmUsageOpenNotchHeight: CGFloat = 240
 let statsGridSpacingHeight: CGFloat = 12
 let notchShadowPaddingStandard: CGFloat = 18
 let notchShadowPaddingMinimalistic: CGFloat = 12

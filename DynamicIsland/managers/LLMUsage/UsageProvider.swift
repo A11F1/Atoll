@@ -59,6 +59,9 @@ struct UsageSnapshot: Equatable {
     var session: UsageTotals = .init()
     var today: UsageTotals = .init()
     var week: UsageTotals = .init()
+    var month: UsageTotals = .init() // current calendar month
+    var lastMonth: UsageTotals = .init() // previous calendar month
+    var total: UsageTotals = .init() // all retained history
     var sessionLimit: UsageLimit? = nil // 5h window quota
     var weekLimit: UsageLimit? = nil // 7d window quota
     var models: [ModelUsage] = []
